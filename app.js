@@ -43,15 +43,54 @@ function startSelection () {
   canvas.addEventListener('mousedown', function (evt) {
     console.log('mousedown: %s, %s', evt.offsetX, evt.offsetY);
     if (!startPoint) {
+      startPoint = {
+        x: evt.offsetX,
+        y: evt.offsetY
+      };
     }
   });
+
+  canvas.addEventListener('mousemove', function (evt) {
+    if (startPoint) {
+      drawSelection(canvas, startPoint, {
+        x: evt.offsetX,
+        y: evt.offsetY
+      });
+    };
+  });
+
   canvas.addEventListener('mouseup', function (evt) {
     console.log('mouseup: %s, %s', evt.offsetX, evt.offsetY);
+    if (startPoint) {
+      drawSelection(canvas, startPoint, {
+        x: evt.offsetX,
+        y: evt.offsetY
+      });
+      startPoint = null;
+      selecting = false;
+    };
   });
 
   document.body.appendChild(canvas);
 };
 startSelection();
+
+function drawSelection (canvas, from, to) {
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = 'rgba(200,40,200,.5)';
+  ctx.strokeStyle = 'black';
+
+  var topLeft = {
+    x: Math.min(from.x, to.x),
+    y: Math.min(from.y, to.y)
+  };
+  var width = Math.abs(from.x - to.x);
+  var height = Math.abs(from.y - to.y);
+
+  ctx.fillRect(topLeft.x, topLeft.y, width, height);
+  ctx.strokeRect(topLeft.x, topLeft.y, width, height);
+};
 
 function initMap() {
   document.getElementById('map').style.marginTop = '100px';
