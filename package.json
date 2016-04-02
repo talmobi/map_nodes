@@ -1,0 +1,16 @@
+{
+  "name": "map_nodes",
+  "version": "0.0.0",
+  "description": "create nodes in an area inside google maps, avoiding water",
+  "main": "app.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "talmobi <talmo.christian@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "lwip": "0.0.8",
+    "request": "^2.69.0",
+    "restify": "^4.0.4"
+  }
+}

@@ -1,0 +1,6 @@
+*.swo
+*.swp
+*.DS_STORE
+node_modules/
+private/
+auth.json
