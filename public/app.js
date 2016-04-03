@@ -68,6 +68,8 @@ function startSelection () {
       });
       startPoint = null;
       selecting = false;
+
+      //sendPlotRequest(map, 640, 480);
     };
   });
 
@@ -75,6 +77,25 @@ function startSelection () {
 };
 startSelection();
 
+function sendPlotRequest (map, width, height) {
+  console.log("sending plot");
+  var req = new XMLHttpRequest();
+  req.open('POST', '/plot', true);
+  var latLng = map.getCenter();
+  var data = {
+    lat: latLng.lat(),
+    lng: latLng.lng(),
+    zoom: map.getZoom(),
+    width: width,
+    height: height
+  };
+  console.log(data);
+  req.setRequestHeader('Content-Type', 'application/json');
+  var str = JSON.stringify(data);
+  req.send(str);
+};
+
+var lastSelection = null;
 function drawSelection (canvas, from, to) {
   var ctx = canvas.getContext('2d');
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -90,6 +111,12 @@ function drawSelection (canvas, from, to) {
 
   ctx.fillRect(topLeft.x, topLeft.y, width, height);
   ctx.strokeRect(topLeft.x, topLeft.y, width, height);
+
+  lastSelection = {
+    topLeft: topLeft,
+    width: width,
+    height: height
+  };
 };
 
 function initMap() {
@@ -217,4 +244,8 @@ function initMap() {
     lng.toFixed(4);
     console.log("Latitude: %s, Longitude: %s", lat, lng);
   };
+
+  // TODO test
+  console.log("sending");
+  sendPlotRequest(map, 640, 480);
 }

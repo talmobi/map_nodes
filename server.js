@@ -3,24 +3,88 @@ var request = require('request');
 var lwip = require('lwip');
 var fs = require('fs');
 
+var express = require('express');
+var app = express();
+
+var bodyParser = require('body-parser');
 var http = require('http');
 
-var server = restify.createServer();
+var server = http.createServer(app);
 
-function respond (req, res, next) {
-  res.send('hello ' + req.params.name);
-  next();
-};
+app.use(express.static('public'));
 
-server.get('/hello/:name', respond);
-server.head('/hello/:name', respond);
+app.use('/plot', bodyParser.json(), function (req, res) {
+  console.log('in /plot');
+  var data = req.body;
+  process.stdout.write("json: ");
+  console.log(data);
 
-server.post('/populate', function (req, res) {
+  console.log("--");
+  process.stdout.write("worldCoord: ");
+  var worldCoord = latLngToWorldCoordinates(data);
+  console.log(worldCoord);
 
+  console.log("--");
+  process.stdout.write("pixelCoord: ");
+  var pixelCoord = worldCoordToPixelCoord(worldCoord, data.zoom);
+  console.log(pixelCoord);
+
+  console.log("--");
+  process.stdout.write("screenCoord: ");
+  var screenCoord = pixelCoordToScreenCoord(pixelCoord, pixelCoord, data.width, data.height);
+  console.log(screenCoord);
 });
 
-server.listen(8080, function () {
-  console.log('%s listening at %s', server.name, server.url);
+var TILE_SIZE = 256;
+// web mercator (used by google maps, bing maps etc)
+function latLngToWorldCoordinates (latLng) {
+  var lat = latLng.lat;
+  var lng = latLng.lng;
+
+  var siny = Math.sin(lat * Math.PI / 180);
+  // trunc to 0.9999
+  var tv = 0.9999;
+  siny = Math.min(Math.max(siny, -tv), tv);
+
+  // woorld coordinate (see web mercator) [0, 255] (floating point)
+  var point = {
+    x: TILE_SIZE * (0.5 + lng / 360),
+    y: TILE_SIZE * (0.5 - Math.log((1 + siny) / (1 - siny)) / (4 * Math.PI))
+  };
+  return point;
+};
+
+// see web mercator
+function worldCoordToPixelCoord (worldCoord, zoom) {
+  var scale = 1 << zoom;
+  return {
+    x: worldCoord.x * scale,
+    y: worldCoord.y * scale
+  };
+};
+
+//
+function pixelCoordToScreenCoord (centerPixelCoord, pixelCoord, width, height) {
+  var c = centerPixelCoord;
+  var p = pixelCoord;
+  var w = width;
+  var h = height;
+
+  var dx = p.x - c.x;
+  var dy = p.y - c.y;
+  dx += width / 2;
+  dy += height / 2;
+
+  return {
+    x: dx | 0,
+    y: dy | 0
+  };
+};
+
+var port = 3000;
+server.listen(port, function () {
+  console.log('server listening at %s', port);
+
 });
 
 var api_key = "AIzaSyAM9wAZBfmsDgFZ9Mo7fU8x7NWDQZUPBQc";

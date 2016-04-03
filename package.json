@@ -9,6 +9,8 @@
   "author": "talmobi <talmo.christian@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "body-parser": "^1.15.0",
+    "express": "^4.13.4",
     "lwip": "0.0.8",
     "request": "^2.69.0",
     "restify": "^4.0.4"
