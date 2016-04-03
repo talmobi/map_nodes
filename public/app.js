@@ -1,5 +1,8 @@
 var map;
 
+var MAP_WIDTH = 640;
+var MAP_HEIGHT = 480;
+
 function createControls () {
   console.log("creating controls");
   var size = {x: 640, y: 100};
@@ -14,11 +17,31 @@ function createControls () {
   controlsEl.style.background = color;
   controlsEl.id = 'controls-id';
   controlsEl.style.borderBottom = "solid 1px black";
+
+  // selection mode button
+  controlsEl.innerHTML = '<button id="select-button">Toggle Selection (inactive)</button>';
+
   document.body.appendChild(controlsEl);
+
+  // click handler for button
+  var btn = document.getElementById('select-button');
+  console.log("btn: " + btn);
+  btn.addEventListener('click', function (evt) {
+    startSelection();
+    btn.innerHTML = "Toggle Selection (ACTIVE!)";
+  });
 };
 createControls();
 
 var selecting = false;
+function stopSelection () {
+  var canvas = document.getElementById('selection-canvas');
+  if (canvas) {
+    canvas.parentNode.removeChild(canvas);
+  }
+  selecting = false;
+};
+
 function startSelection () {
   selecting = true;
 
@@ -69,13 +92,18 @@ function startSelection () {
       startPoint = null;
       selecting = false;
 
+      var btn = document.getElementById('select-button');
+      btn.innerHTML = "Toggle Selection (inactive)";
+      stopSelection();
+
       //sendPlotRequest(map, 640, 480);
+      sendPlotSelectionRequest(map, MAP_WIDTH, MAP_HEIGHT, lastSelection);
     };
   });
 
   document.body.appendChild(canvas);
 };
-startSelection();
+//startSelection();
 
 function sendPlotRequest (map, width, height) {
   console.log("sending plot");
@@ -92,6 +120,43 @@ function sendPlotRequest (map, width, height) {
   console.log(data);
   req.setRequestHeader('Content-Type', 'application/json');
   var str = JSON.stringify(data);
+  req.send(str);
+};
+
+function sendPlotSelectionRequest (map, width, height, selection) {
+  console.log("sending plot selection");
+  var req = new XMLHttpRequest();
+  req.open('POST', '/plot', true);
+  var latLng = map.getCenter();
+  var data = {
+    center: {
+      lat: latLng.lat(),
+      lng: latLng.lng()
+    },
+    zoom: map.getZoom(),
+    width: width,
+    height: height,
+    selection: selection
+  };
+  console.log(data);
+  req.setRequestHeader('Content-Type', 'application/json');
+  var str = JSON.stringify(data);
+
+  // listen for response
+  req.onload = function () {
+    console.log("status: " + req.status);
+    if (req.status >= 200 && req.status < 400) {
+      var resp = JSON.parse(req.responseText);
+      console.log(resp);
+
+      var nodes = resp;
+      drawNodes(nodes);
+
+      // add markers for nodes
+      addNodeMarkers(nodes, true);
+    }
+  };
+
   req.send(str);
 };
 
@@ -117,16 +182,20 @@ function drawSelection (canvas, from, to) {
     width: width,
     height: height
   };
+  return lastSelection;
 };
 
 function initMap() {
   document.getElementById('map').style.marginTop = '100px';
-  var center = {lat: -34.397, lng: 150.644};
-  var zoom = 11;
+  var center = {lat: 61.47734486467206, lng: 23.75942034149171};
+  var zoom = 15;
   map = new google.maps.Map(document.getElementById('map'), {
     center: center,
     zoom: zoom
   });
+  var mapEl = document.getElementById('map');
+  mapEl.style.width = MAP_WIDTH + "px";
+  mapEl.style.height = MAP_HEIGHT + "px";
 
   var overlay;
   overlay = new google.maps.OverlayView();
@@ -138,9 +207,47 @@ function initMap() {
     return overlay.getProjection().fromContainerPixelToLatLng(point);
   };
 
+  var nodeMarkers = [];
+  function addNodeMarkers (nodes, deleteDrawNodes) {
+    console.log("nodes.length: " + nodes.length);
+    if (!nodes.forEach || nodes.length <= 0) return;
+    // clear prevoius markers
+    console.log("clearing previous markers");
+    nodeMarkers.forEach(function (marker) {
+      marker.setMap(null);
+    });
+
+    console.log("creating markers");
+
+    // add new markers
+    nodes.forEach(function (node) {
+      var pos = node.pixel;
+      pos.y -= 100;
+      //pixel.y += 100; // controls offset
+      var latLng = fromContainerPixelToLatLng( pos );
+      var marker = addMarker(latLng, {scale: 3, color: node.water ? 'blue' : 'olive'});
+      nodeMarkers.push(marker); // save for deletion later
+    });
+
+    if (deleteDrawNodes) {
+      setTimeout(function () {
+        console.log("deleting debug nodes");
+        // remove old selecion debug nodes
+        var nodeElements = document.getElementsByClassName('node');
+        while (nodeElements[0]) {
+          var n = nodeElements[0];
+          n.parentNode.removeChild( n );
+        }
+      }, Math.min(nodes.length * 1.8, 5000));
+    }
+
+  };
+  window.addNodeMarkers = addNodeMarkers;
+
   var marker;
-  function addMarker (latLng) {
-    var resultColor = 'green';
+  function addMarker (latLng, opts) {
+    var opts = opts || {};
+    var resultColor = opts.color || 'green';
     var pos = {lat: latLng.lat(), lng: latLng.lng()};
 
     marker = new google.maps.Marker({
@@ -152,13 +259,16 @@ function initMap() {
         fillOpacity: .45,
         strokeColor: 'black',
         strokeWeight: .5,
-        scale: 10
+        scale: opts.scale || 10,
+        editable: false
       }
     });
+    return marker;
   };
   window.addMarker = addMarker;
 
   map.addListener('click', function (evt) {
+    return;
     if (marker) {
       marker.setMap(null);
     }
@@ -211,6 +321,46 @@ function initMap() {
     return new google.maps.Point((worldPoint.x - bottomLeft.x) * scale, (worldPoint.y - topRight.y) * scale);
   };
 
+  function drawNodes(nodes) {
+    // remove old selecion debug nodes
+    var nodeElements = document.getElementsByClassName('node');
+    while (nodeElements[0]) {
+      var n = nodeElements[0];
+      n.parentNode.removeChild( n );
+    }
+
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      drawNode(node);
+    };
+  };
+  window.drawNodes = drawNodes;
+
+  function drawNode (node, opts) {
+    if (!node.pixel)
+      return;
+
+    var color = node.water ? 'cyan' : 'olive';
+
+    var opts = opts || {};
+    var size = opts.size || 5;
+
+    var point = node.pixel;
+    point.y += 100; // controls offset
+    var pointEl = document.createElement('div');
+    pointEl.style.position = 'fixed';
+    pointEl.style.width = size + 'px';
+    pointEl.style.height = size + 'px';
+    pointEl.style.left = point.x - (size >> 1) + 'px';
+    pointEl.style.top = point.y - (size >> 1) + 'px';
+    pointEl.style.background = color;
+    pointEl.style['border-radius'] = '50%';
+    pointEl.className = "node";
+    document.body.appendChild(pointEl);
+    return pointEl;
+  };
+  window.drawNode = drawNode;
+
   function drawPixel (point, opts) {
     var id = 'pixel-' + opts.color || 'none';
     var pixelEl = document.getElementById( id );
@@ -226,7 +376,7 @@ function initMap() {
     pointEl.style.width = size + 'px';
     pointEl.style.height = size + 'px';
     pointEl.style.left = point.x - (size >> 1) + 'px';
-    pointEl.style.top = point.y - (size >> 1) + 'px';
+    pointEl.style.top = point.y + 100 - (size >> 1) + 'px'; // controls offset is 100
     pointEl.style.background = color;
     pointEl.id = id;
     document.body.appendChild(pointEl);
@@ -246,6 +396,6 @@ function initMap() {
   };
 
   // TODO test
-  console.log("sending");
-  sendPlotRequest(map, 640, 480);
+  //sendPlotRequest(map, 640, 480);
+  //sendPlotSelectionRequest(map, MAP_WIDTH, MAP_HEIGHT, lastSelection);
 }

@@ -6,6 +6,11 @@ var fs = require('fs');
 var express = require('express');
 var app = express();
 
+var params = {
+  spacing: 9, // plot nodes every $spacing pixels
+  avg: 1 // surround pixel depth to take averages from
+};
+
 var bodyParser = require('body-parser');
 var http = require('http');
 
@@ -16,23 +21,40 @@ app.use(express.static('public'));
 app.use('/plot', bodyParser.json(), function (req, res) {
   console.log('in /plot');
   var data = req.body;
-  process.stdout.write("json: ");
-  console.log(data);
+  //process.stdout.write("json: ");
+  //console.log(data);
 
-  console.log("--");
-  process.stdout.write("worldCoord: ");
-  var worldCoord = latLngToWorldCoordinates(data);
-  console.log(worldCoord);
+  //console.log("--");
+  //process.stdout.write("worldCoord: ");
+  //var worldCoord = latLngToWorldCoordinates(data.center);
+  //console.log(worldCoord);
 
-  console.log("--");
-  process.stdout.write("pixelCoord: ");
-  var pixelCoord = worldCoordToPixelCoord(worldCoord, data.zoom);
-  console.log(pixelCoord);
+  //console.log("--");
+  //process.stdout.write("pixelCoord: ");
+  //var pixelCoord = worldCoordToPixelCoord(worldCoord, data.zoom);
+  //console.log(pixelCoord);
 
-  console.log("--");
-  process.stdout.write("screenCoord: ");
-  var screenCoord = pixelCoordToScreenCoord(pixelCoord, pixelCoord, data.width, data.height);
-  console.log(screenCoord);
+  //console.log("--");
+  //process.stdout.write("screenCoord: ");
+  //var screenCoord = pixelCoordToScreenCoord(pixelCoord, pixelCoord, data.width, data.height);
+  //console.log(screenCoord);
+
+  if (data.selection) {
+    console.log("got selection");
+    //lastSelection = {
+    //  topLeft: topLeft,
+    //  width: width,
+    //  height: height
+    //};
+    plotSelection(req.body, function (err, data) {
+      if (err) throw err;
+      console.log("responding with plot selection data");
+      res.json(data).end();
+    });
+  } else {
+    res.json("got plot").end();
+  }
+
 });
 
 var TILE_SIZE = 256;
@@ -87,16 +109,16 @@ server.listen(port, function () {
 
 });
 
+// google maps api key (limited)
 var api_key = "AIzaSyAM9wAZBfmsDgFZ9Mo7fU8x7NWDQZUPBQc";
 /*
     <script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAM9wAZBfmsDgFZ9Mo7fU8x7NWDQZUPBQc&callback=initMap"></script>
 */
 
+var googleMapsStaticTemplate = "http://maps.googleapis.com/maps/api/staticmap?center=<lat>,<lng>&zoom=<zoom>&size=<width>x<height>";
 
-    var googleMapsStaticTemplate = "http://maps.googleapis.com/maps/api/staticmap?center=<lat>,<lng>&zoom=<zoom>&size=<width>x<height>";
-
-    // query string addon to invert and desaturate the water
-    var googleMapsStaticStyles_WaterInverted = "&style=element:labels|visibility:off&style=element:geometry.stroke|visibility:off&style=feature:landscape|element:geometry|saturation:-100&style=feature:water|saturation:-100|invert_lightness:true&key=<key>";
+// query string addon to invert and desaturate the water
+var googleMapsStaticStyles_WaterInverted = "&style=element:labels|visibility:off&style=element:geometry.stroke|visibility:off&style=feature:landscape|element:geometry|saturation:-100&style=feature:water|saturation:-100|invert_lightness:true&key=<key>";
 
 function buildGoogleMapsStaticUrl (opts) {
   var url = googleMapsStaticTemplate + googleMapsStaticStyles_WaterInverted;
@@ -129,6 +151,144 @@ console.log("-------------");
 console.log(url);
 console.log("-------------");
 
+function plotSelection (data, callback) {
+  var url = buildGoogleMapsStaticUrl({
+    lat: data.center.lat,
+    lng: data.center.lng,
+    zoom: data.zoom,
+    width: data.width,
+    height: data.height
+  });
+
+  console.log("w: %s, h: %s", data.width, data.height);
+
+  //var fileName = __dirname + "/images/staticmap_image:" + url + ".png";
+  //var fileName = "images/staticmap_image:" + url + ".png";
+  var str = [data.center.lat, data.center.lng, data.zoom, data.width, data.height].join('_');
+  var fileName = "images/staticmap_image-" + str + ".png";
+
+  var plot = function () {
+    console.log(">>> download finished! <<<: " + url);
+
+    // investiage the image with lwip
+    lwip.open(fileName, function (err, image) {
+      if (err) throw err;
+
+      var w = image.width();
+      var h = image.height();
+      var len = w * h;
+
+      var waterPixels = 0;
+
+      // return average of surronding pixels
+      var avgPixel = function (x, y, len) {
+        if (len <= 0) {
+          return image.getPixel(x, y);
+        }
+
+        var sum = {r: 0, g: 0, b: 0, a: 0};
+        var count = 1;
+
+        var start = {
+          x: Math.max(0, x - len) | 0,
+          y: Math.max(0, y - len) | 0
+        };
+
+        var end = {
+          x: Math.min(w, x + len) | 0,
+          y: Math.min(h, y + len) | 0
+        };
+
+        //console.log(start);
+        //console.log(end);
+
+        for (var i = start.x; i < end.x; i++) {
+          for (var j = start.y; j < end.y; j++) {
+            count++;
+            var p = image.getPixel(i, j);
+            sum.r += p.r;
+            sum.g += p.g;
+            sum.b += p.b;
+            sum.a += p.a;
+          }
+        };
+        //console.log("avg count: " + count);
+        return {
+          r: sum.r / count,
+          g: sum.g / count,
+          b: sum.b / count,
+          a: sum.a / count
+        }
+      };
+
+      // determine if a pixel value is water
+      var isWaterPixel = function (pixel) {
+        //var pixel = {r: 0, g: 0, b: 0, a: 0};
+        // assuming a styled google maps static image the water pixels should
+        // be very dark (black)
+        var p = pixel;
+        var limit = 130;
+        return (p.r < limit && p.g < limit && p.b < limit);
+      };
+
+      for (var i = 0; i < len; i++) {
+        var p = image.getPixel(i % w, (i / w) | 0);
+        // {r: 255, g: 255, b: 255, a: 100}
+        if (isWaterPixel(p)) {
+          waterPixels++;
+        }
+      };
+
+      var delta = ((waterPixels / len).toFixed(4)) * 100;
+      console.log("len: %s, waterPixels: %s, delta: %s %", len, waterPixels, delta);
+
+      // investiage selection
+      var topLeft = data.selection.topLeft;
+      var sw = data.selection.width;
+      var sh = data.selection.height;
+      process.stdout.write("selection: ")
+        console.log(data.selection);
+
+      var results = [];
+
+      var centerAvg = avgPixel(topLeft.x + sw / 2, topLeft.y + sh / 2, 1);
+      process.stdout.write("avg center: ")
+        console.log( centerAvg );
+      console.log("center is water: " + isWaterPixel(centerAvg));
+
+      // plot every 10 pixels
+      var spacing = params.spacing || 10;
+      for (var i = 0; i < sw; i += spacing) {
+        for (var j = 0; j < sh; j += spacing) {
+          var pixel = {
+            x: topLeft.x + i,
+            y: topLeft.y + j
+          }
+          var isWater = isWaterPixel( avgPixel( pixel.x, pixel.y, params.avg || 0) );
+          results.push({
+            pixel: pixel,
+            water: isWater
+          });
+        }
+      };
+
+      console.log("plotted %s pixels", results.length);
+      callback(null, results);
+    });
+  };
+
+  fs.access(fileName, fs.R_OK | fs.W_OK, function (err) {
+    if (err) {
+      console.log("downloading file before plot");
+      download(url, fileName, plot);
+    } else {
+      console.log("file exists, plotting now!");
+      plot();
+    }
+  });
+};
+
+/*
 download(url, 'image.png', function () {
   lwip.open('image.png', function (err, image) {
     if (err) throw err;
@@ -146,9 +306,10 @@ download(url, 'image.png', function () {
         waterPixels++;
     };
 
-    var delta = (waterPixels / len).toFixed(4);
-    console.log("len: %s, waterPixels: %s, delta: %s", len, waterPixels, delta);
+    var delta = ((waterPixels / len).toFixed(4)) * 100;
+    console.log("len: %s, waterPixels: %s, delta: %s %", len, waterPixels, delta);
   });
 
   console.log('finished!');
 });
+*/
