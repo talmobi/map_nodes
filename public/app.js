@@ -18,8 +18,12 @@ function createControls () {
   controlsEl.id = 'controls-id';
   controlsEl.style.borderBottom = "solid 1px black";
 
+  var selectionButton = '<button id="select-button">Toggle Selection (inactive)</button>';
+  var gridInfo = '<span id="grid-info">Grid Info</span>';
+
+  var els = [selectionButton, gridInfo];
   // selection mode button
-  controlsEl.innerHTML = '<button id="select-button">Toggle Selection (inactive)</button>';
+  controlsEl.innerHTML = els.join('<hr>');
 
   document.body.appendChild(controlsEl);
 
@@ -123,6 +127,9 @@ function sendPlotRequest (map, width, height) {
   req.send(str);
 };
 
+var gridTopLeftMarker = null;
+var gridBotRightMarker = null;
+
 function sendPlotSelectionRequest (map, width, height, selection) {
   console.log("sending plot selection");
   var req = new XMLHttpRequest();
@@ -149,11 +156,95 @@ function sendPlotSelectionRequest (map, width, height, selection) {
       var resp = JSON.parse(req.responseText);
       console.log(resp);
 
-      var nodes = resp;
+      var results = resp.results;
+      var bucket = {
+        //edgeResults: edgeResults, // TODO (WIP), land/water edges only
+        landResults: results.filter(function (r) {return !r.water}), // land only
+        waterResults: results.filter(function (r) {return r.water}) // water only
+      };
+
+      var nodes = bucket.landResults;
+      //var nodes = bucket.waterResults;
       drawNodes(nodes);
 
       // add markers for nodes
       addNodeMarkers(nodes, true);
+
+      // add info windows on results (grid) topLeft and botRight corners
+      var gridInfoEl = document.getElementById('grid-info');
+      var gridInnerHTML = "";
+
+      // top left
+      var pos = results[0].pixel;
+      var position = {
+        x: pos.x,
+        y: pos.y - 100
+      };
+      var latLng = fromContainerPixelToLatLng( position );
+      if (gridTopLeftMarker) {
+        gridTopLeftMarker.setMap(null); // clear previous
+      }
+      gridTopLeftMarker = addMarker(latLng, {scale: 3, color: 'black'});
+      var text = "Top Left - lat: $lat, lng: $lng"
+        .replace('$lat', latLng.lat())
+        .replace('$lng', latLng.lng());
+      gridInnerHTML += text + "<br>";
+
+      // bot right
+      var pos = results[ results.length - 1 ].pixel;
+      var position = {
+        x: pos.x,
+        y: pos.y - 100
+      };
+      var latLng = fromContainerPixelToLatLng( position );
+      if (gridBotRightMarker) {
+        gridBotRightMarker.setMap(null); // clear previous
+      }
+      gridBotRightMarker = addMarker(latLng, {scale: 3, color: 'black'});
+      var text = "Bot Right: lat: $lat, lng: $lng"
+        .replace('$lat', latLng.lat())
+        .replace('$lng', latLng.lng());
+      gridInnerHTML += text + "<br>";
+
+      gridInfoEl.innerHTML = gridInnerHTML;
+      /*
+      var pos = results[0].pixel;
+      var position = {
+        x: pos.x,
+        y: pos.y - 100
+      };
+      var latLng = fromContainerPixelToLatLng( position );
+      var topLeftMarker = addMarker(latLng, {scale: 3, color: 'black'});
+      var text = "lat: $lat, lng: $lng"
+        .replace('$lat', latLng.lat())
+        .replace('$lng', latLng.lng());
+      var infoWindow = new google.maps.InfoWindow({
+        content: text
+      });
+      // add info window to marker
+      infoWindow.open(map, topLeftMarker);
+
+      // add to botleft
+      var pos = results[ results.length - 1 ].pixel;
+      var position = {
+        x: pos.x,
+        y: pos.y - 100
+      };
+      var latLng = fromContainerPixelToLatLng( position );
+      var topLeftMarker = addMarker(latLng, {scale: 3, color: 'black'});
+        topLeftMarker.anchorPoint = {
+          x: 100,
+          y: 100
+        }
+      var text = "lat: $lat, lng: $lng"
+        .replace('$lat', latLng.lat())
+        .replace('$lng', latLng.lng());
+      var infoWindow = new google.maps.InfoWindow({
+        content: text,
+      });
+      // add info window to marker
+      infoWindow.open(map, topLeftMarker);
+      */
     }
   };
 
@@ -206,6 +297,7 @@ function initMap() {
   function fromContainerPixelToLatLng(point) {
     return overlay.getProjection().fromContainerPixelToLatLng(point);
   };
+  window.fromContainerPixelToLatLng = fromContainerPixelToLatLng;
 
   var nodeMarkers = [];
   function addNodeMarkers (nodes, deleteDrawNodes) {
@@ -222,9 +314,12 @@ function initMap() {
     // add new markers
     nodes.forEach(function (node) {
       var pos = node.pixel;
-      pos.y -= 100;
+      var position = {
+        x: pos.x,
+        y: pos.y - 100
+      };
       //pixel.y += 100; // controls offset
-      var latLng = fromContainerPixelToLatLng( pos );
+      var latLng = fromContainerPixelToLatLng( position );
       var marker = addMarker(latLng, {scale: 3, color: node.water ? 'blue' : 'olive'});
       nodeMarkers.push(marker); // save for deletion later
     });
@@ -240,6 +335,22 @@ function initMap() {
         }
       }, Math.min(nodes.length * 1.8, 5000));
     }
+
+    /*
+    var createInfoAtNode (node) {
+      var pos = node.pixel; // pixel position of node
+      pos.y -= 100; // controls offset
+      var latLng = fromContainerPixelToLatLng( pos );
+    };
+    // draw basic info markers (top left latLng, bot right latLng)
+    var topLeftNode = nodes[0];
+    var topLeft = {
+      node: nodes[0],
+      latLng: {nodes[0]}
+      text: ""
+    }
+    var botRight = nodes[nodes.length - 1];
+    */
 
   };
   window.addNodeMarkers = addNodeMarkers;

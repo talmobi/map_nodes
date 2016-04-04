@@ -227,7 +227,7 @@ function plotSelection (data, callback) {
         // assuming a styled google maps static image the water pixels should
         // be very dark (black)
         var p = pixel;
-        var limit = 130;
+        var limit = 140;
         return (p.r < limit && p.g < limit && p.b < limit);
       };
 
@@ -267,13 +267,60 @@ function plotSelection (data, callback) {
           var isWater = isWaterPixel( avgPixel( pixel.x, pixel.y, params.avg || 0) );
           results.push({
             pixel: pixel,
-            water: isWater
+            water: isWater,
+            edge: false
           });
         }
       };
 
+      // water/land edge detection, filter out non-edges
+      // TODO
+      //var len = results.length;
+      var w = (sw / spacing) | 0;
+      var h = (sh / spacing) | 0;
+      console.log("w: %s, h: %s, spacing: %s", w, h, spacing);
+      for (var i = 0; i < results.length; i++) {
+        var x = i % w;
+        x = Math.min(x, w - 1);
+        var y = (i / w) | 0;
+        y = Math.min(y, h - 1);
+        var r = results[x + y * w];
+        var r_right = results[(x + 1) + y * w];
+        var r_bot = results[(x) + (y + 1) * w];
+        if (r_right !== undefined && r.water != r_right.water) {
+          r.edge = r_right.edge = true;
+        }
+        if (r_right === undefined) {
+          console.log("r_right was UNDEFINED");
+        }
+        if (r_bot !== undefined && r.water != r_bot.water) {
+          r.edge = r_bot.edge = true;
+        }
+        if (r_bot === undefined) {
+          console.log("r_bot was UNDEFINED");
+        }
+      }
+
+      var edgeResults = results.filter(function (result) {
+        return result.edge === true;
+      });
+
+      // filter away water
+      var landResults = results.filter(function (result) {
+        return result.water === false;
+      });
+
+      console.log("results.length: %s, edgeResults.length: %s", results.length, edgeResults.length);
+
       console.log("plotted %s pixels", results.length);
-      callback(null, results);
+      //callback(null, edgeResults || results);
+      //callback(null, edgeResults);
+      //callback(null, results);
+      callback(null, {
+        width: w,
+        height: h,
+        results: results // all results (full grid)
+      });
     });
   };
 
