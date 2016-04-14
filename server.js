@@ -6,6 +6,8 @@ var fs = require('fs');
 var express = require('express');
 var app = express();
 
+var port = 10100;
+
 var params = {
   spacing: 9, // plot nodes every $spacing pixels
   avg: 1 // surround pixel depth to take averages from
@@ -15,6 +17,11 @@ var bodyParser = require('body-parser');
 var http = require('http');
 
 var server = http.createServer(app);
+
+app.use('*', function (req, res, next) {
+  console.log("incoming request");
+  next();
+});
 
 app.use(express.static('public'));
 
@@ -54,7 +61,6 @@ app.use('/plot', bodyParser.json(), function (req, res) {
   } else {
     res.json("got plot").end();
   }
-
 });
 
 var TILE_SIZE = 256;
@@ -103,10 +109,8 @@ function pixelCoordToScreenCoord (centerPixelCoord, pixelCoord, width, height) {
   };
 };
 
-var port = 3001;
 server.listen(port, function () {
   console.log('server listening at %s', port);
-
 });
 
 // google maps api key (limited)

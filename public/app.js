@@ -133,7 +133,7 @@ var gridBotRightMarker = null;
 function sendPlotSelectionRequest (map, width, height, selection) {
   console.log("sending plot selection");
   var req = new XMLHttpRequest();
-  req.open('POST', '/plot', true);
+  req.open('POST', location.pathname + 'plot', true);
   var latLng = map.getCenter();
   var data = {
     center: {
