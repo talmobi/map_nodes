@@ -2,7 +2,7 @@
   "name": "map_nodes",
   "version": "0.0.0",
   "description": "create nodes in an area inside google maps, avoiding water",
-  "main": "app.js",
+  "main": "server.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },

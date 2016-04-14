@@ -509,4 +509,51 @@ function initMap() {
   // TODO test
   //sendPlotRequest(map, 640, 480);
   //sendPlotSelectionRequest(map, MAP_WIDTH, MAP_HEIGHT, lastSelection);
+  //
+
+  // TODO send selected nodes to web socket
+  function sendToSocket () {
+    console.log("send to socket running");
+
+    // Connect to Ixonos wifi network (else connection is refused)
+    var wsurl_teemu = "ws://10.254.36.169"; // teemus server
+    var wsurl_stan = "ws://10.254.36.152"; // stans server
+
+    var wsurl = wsurl_teemu;
+    var auth_port = 8013; // auth and get session id
+    var meta_port = 8012; // send node information using session id
+
+    var auth_url = wsurl + ":" + auth_port;
+    var meta_url = wsurl + ":" + meta_port;
+
+    // hardcoded test credentials
+    // TODO valid? getting result:2 and empty data
+    username = "admin";
+    password = "somepw";
+
+    console.log("connecting to: " + auth_url);
+    var connection = new WebSocket(auth_url);
+    connection.onerror = function (err) {
+      console.log("connection error: " + err);
+    };
+    connection.onmessage = function (e) {
+      console.log("connection message: ");
+      console.log(e.data);
+    };
+
+    connection.onopen = function () {
+      console.log("connection open");
+
+      // send auth message -> should receive session id
+      var data = {
+        "version": 1,
+        "type": 1,
+        "data": {
+          "username": username, "password": password 
+        }
+      };
+      connection.send(data);
+    };
+  };
+  window.sendToSocket = sendToSocket;
 }

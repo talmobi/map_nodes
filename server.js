@@ -1,4 +1,4 @@
-var restify = require('restify');
+//var restify = require('restify');
 var request = require('request');
 var lwip = require('lwip');
 var fs = require('fs');
@@ -103,7 +103,7 @@ function pixelCoordToScreenCoord (centerPixelCoord, pixelCoord, width, height) {
   };
 };
 
-var port = 3000;
+var port = 3001;
 server.listen(port, function () {
   console.log('server listening at %s', port);
 
