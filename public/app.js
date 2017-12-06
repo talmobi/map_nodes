@@ -273,6 +273,7 @@ function drawSelection (canvas, from, to) {
     width: width,
     height: height
   };
+
   return lastSelection;
 };
 

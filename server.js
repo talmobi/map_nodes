@@ -1,6 +1,8 @@
 //var restify = require('restify');
 var request = require('request');
-var lwip = require('lwip');
+// var lwip = require('lwip');
+var sharp = require( 'sharp' )
+// var getPixels = require( 'get-pixel' )
 var fs = require('fs');
 
 var express = require('express');
@@ -141,10 +143,12 @@ var url = buildGoogleMapsStaticUrl({
 })
 //console.log(url);
 
-var Stream = require('stream').Transform;
+var Stream = require( 'stream' ).Transform;
 
-function download (url, filename, callback) {
-  request(url).pipe(fs.createWriteStream(filename)).on('close', callback);
+function download ( url, filename, callback ) {
+  request( url )
+  .pipe( fs.createWriteStream( filename ) )
+  .on( 'close', callback )
 };
 
 console.log("-------------");
@@ -164,25 +168,70 @@ function plotSelection (data, callback) {
 
   //var fileName = __dirname + "/images/staticmap_image:" + url + ".png";
   //var fileName = "images/staticmap_image:" + url + ".png";
-  var str = [data.center.lat, data.center.lng, data.zoom, data.width, data.height].join('_');
+  var str = [
+    data.center.lat,
+    data.center.lng,
+    data.zoom,
+    data.width,
+    data.height
+  ].join('_');
   var fileName = "images/staticmap_image-" + str + ".png";
 
-  var plot = function () {
-    console.log(">>> download finished! <<<: " + url);
+  fs.access(fileName, fs.R_OK | fs.W_OK, function (err) {
+    if (err) {
+      console.log("downloading file before plot");
+      download(url, fileName, plot);
+    } else {
+      console.log("file exists, plotting now!");
+      plot();
+    }
+  });
+
+  function plot () {
+    console.log(">>> download finished! <<<: " + url.slice( 0, 10 ));
 
     // investiage the image with lwip
-    lwip.open(fileName, function (err, image) {
-      if (err) throw err;
+    // lwip.open(fileName, function (err, image) {
+    sharp( fileName )
+    .resize( data.width, data.height )
+    .toBuffer()
+    .then( function ( pixels ) {
+      console.log( 'pixels.length: ' + pixels.length )
+      console.log( pixels [ 0 ] )
 
-      var w = image.width();
-      var h = image.height();
-      var len = w * h;
+      return
 
       var waterPixels = 0;
 
+      var len = pixels.length
+
+      var image = {}
+      image.getPixel = function ( x, y ) {
+        var sp = ( x + y * pixels.width )
+        var p = pixels[ sp ]
+
+        console.log( p )
+
+        var r = p & 0xFF >> 24
+        var g = p & 0x00FF >> 16
+        var b = p & 0x0000FF >> 8
+        var a = p & 0x000000FF
+
+        var pixel = {
+          r: r,
+          g: g,
+          b: b,
+          a: a
+        }
+
+        // console.log( pixel )
+
+        return pixel
+      }
+
       // return average of surronding pixels
-      var avgPixel = function (x, y, len) {
-        if (len <= 0) {
+      var avgPixel = function (x, y, len ) {
+        if ( len <= 0 ) {
           return image.getPixel(x, y);
         }
 
@@ -232,7 +281,7 @@ function plotSelection (data, callback) {
       };
 
       for (var i = 0; i < len; i++) {
-        var p = image.getPixel(i % w, (i / w) | 0);
+        var p = image.getPixel(i % w, (i / w) | 0);
         // {r: 255, g: 255, b: 255, a: 100}
         if (isWaterPixel(p)) {
           waterPixels++;
@@ -321,18 +370,11 @@ function plotSelection (data, callback) {
         height: h,
         results: results // all results (full grid)
       });
-    });
-  };
-
-  fs.access(fileName, fs.R_OK | fs.W_OK, function (err) {
-    if (err) {
-      console.log("downloading file before plot");
-      download(url, fileName, plot);
-    } else {
-      console.log("file exists, plotting now!");
-      plot();
-    }
-  });
+    })
+    .catch( function ( err ) {
+      throw err
+    } )
+  }
 };
 
 /*
