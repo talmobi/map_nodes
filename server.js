@@ -194,28 +194,31 @@ function plotSelection (data, callback) {
     // lwip.open(fileName, function (err, image) {
     sharp( fileName )
     .resize( data.width, data.height )
+    .raw()
     .toBuffer()
     .then( function ( pixels ) {
-      console.log( 'pixels.length: ' + pixels.length )
-      console.log( pixels [ 0 ] )
-
-      return
+      console.log( 'pixels.length: ' + pixels.length + ', data.length: ' + data.width * data.height )
+      console.log( pixels[ 0 ] )
 
       var waterPixels = 0;
 
+      var w = data.width
+      var h = data.height
       var len = pixels.length
 
       var image = {}
+
       image.getPixel = function ( x, y ) {
-        var sp = ( x + y * pixels.width )
+        var sp = ( x + y * data.width )
+        sp = sp * 3
         var p = pixels[ sp ]
 
-        console.log( p )
+        // console.log( p )
 
-        var r = p & 0xFF >> 24
-        var g = p & 0x00FF >> 16
-        var b = p & 0x0000FF >> 8
-        var a = p & 0x000000FF
+        var r = pixels[ sp ]
+        var g = pixels[ sp + 1 ]
+        var b = pixels[ sp + 2 ]
+        var a = 255
 
         var pixel = {
           r: r,
@@ -313,7 +316,9 @@ function plotSelection (data, callback) {
             x: topLeft.x + i,
             y: topLeft.y + j
           }
+
           var isWater = isWaterPixel( avgPixel( pixel.x, pixel.y, params.avg || 0) );
+
           results.push({
             pixel: pixel,
             water: isWater,

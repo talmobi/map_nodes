@@ -286,6 +286,7 @@ function initMap() {
     zoom: zoom
   });
   var mapEl = document.getElementById('map');
+
   mapEl.style.width = MAP_WIDTH + "px";
   mapEl.style.height = MAP_HEIGHT + "px";
 
@@ -317,7 +318,7 @@ function initMap() {
       var pos = node.pixel;
       var position = {
         x: pos.x,
-        y: pos.y - 100
+        y: pos.y
       };
       //pixel.y += 100; // controls offset
       var latLng = fromContainerPixelToLatLng( position );
@@ -358,7 +359,7 @@ function initMap() {
 
   var marker;
   function addMarker (latLng, opts) {
-    var opts = opts || {};
+    var opts = opts || {};
     var resultColor = opts.color || 'green';
     var pos = {lat: latLng.lat(), lng: latLng.lng()};
 
@@ -455,16 +456,16 @@ function initMap() {
     var color = node.water ? 'cyan' : 'olive';
 
     var opts = opts || {};
-    var size = opts.size || 5;
+    var size = opts.size || 5;
 
     var point = node.pixel;
-    point.y += 100; // controls offset
+    // point.y += 100; // controls offset
     var pointEl = document.createElement('div');
     pointEl.style.position = 'fixed';
     pointEl.style.width = size + 'px';
     pointEl.style.height = size + 'px';
     pointEl.style.left = point.x - (size >> 1) + 'px';
-    pointEl.style.top = point.y - (size >> 1) + 'px';
+    pointEl.style.top = point.y + 100 - (size >> 1) + 'px';
     pointEl.style.background = color;
     pointEl.style['border-radius'] = '50%';
     pointEl.className = "node";
@@ -476,6 +477,7 @@ function initMap() {
   function drawPixel (point, opts) {
     var id = 'pixel-' + opts.color || 'none';
     var pixelEl = document.getElementById( id );
+
     if (pixelEl) {
       pixelEl.parentNode.removeChild(pixelEl);
     }
