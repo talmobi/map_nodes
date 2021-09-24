@@ -20,6 +20,10 @@ var http = require('http');
 
 var server = http.createServer(app);
 
+try {
+  fs.mkdirSync('images/')
+} catch (err) { /* ignore */ }
+
 app.use('*', function (req, res, next) {
   console.log("incoming request");
   next();
